@@ -35,20 +35,27 @@ L'application a besoin de l'API pour afficher les produits. Une URL `localhost` 
 une IP `192.168.x.x` ne fonctionne que sur le même Wi-Fi. Pour que l'application
 fonctionne en données mobiles, l'API doit être accessible via Internet.
 
-### Option A — Render (gratuit, URL stable) — recommandé
+### Option A — Coolify sur VPS Hostinger (solution retenue)
 
-1. Pousser le projet sur GitHub.
-2. Créer un compte sur [render.com](https://render.com).
-3. **New → Blueprint**, choisir le dépôt GitHub : Render lit `render.yaml`.
-4. Renseigner `STRIPE_SECRET_KEY` (clé `sk_test_...` de `server/.env`).
-5. Attendre le déploiement, puis copier l'URL fournie, par exemple :
-   `https://elan-api.onrender.com`.
+L'API tourne en permanence dans un conteneur Docker géré par Coolify.
 
-L'URL de l'API est alors `https://elan-api.onrender.com/api`.
+- Dépôt déployé : `gitlab.com/jentrepreneur6/boutique-en-ligne`, branche `feature/deployment`
+- Fichiers utilisés par Coolify : `server/Dockerfile` et `server/docker-compose.yaml`
+- URL publique actuelle :
 
-> Le plan gratuit Render met le service en veille après une période d'inactivité :
-> la première requête peut prendre 20–30 secondes. La base SQLite est réinitialisée
-> à chaque redémarrage, mais les produits de démonstration sont reseedés au démarrage.
+```
+http://jizbyhbadbb5o77vr9wefyvq.31.97.35.128.sslip.io/api
+```
+
+> Le VPS étant toujours allumé, il n'y a pas de mise en veille (contrairement à
+> l'offre gratuite de Render). La base SQLite est conservée dans un volume Docker.
+
+> ⚠️ Cette URL est servie en **HTTP** (pas de certificat TLS). C'est pourquoi
+> `app.json` active `usesCleartextTraffic` via `expo-build-properties` : sans cela,
+> Android bloquerait tous les appels réseau de l'application.
+> Pour passer en HTTPS : Coolify → application → **Domains** → activer
+> **HTTPS / Let's Encrypt** → **Save** → **Redeploy**, puis mettre à jour
+> `EXPO_PUBLIC_API_URL` et reconstruire l'APK.
 
 ### Option B — Tunnel Cloudflare (temporaire, aucune inscription)
 
@@ -84,9 +91,30 @@ eas build -p android --profile preview
 
 ## 5. Taille de l'application
 
-Le build Android précédent pèse **48,8 Mo**, donc sous la limite de 100 Mo.
-Si un futur build dépasse 100 Mo, ajouter `expo-build-properties` avec
-`enableProguardInReleaseBuilds` et `enableShrinkResources`.
+Contrainte : l'APK doit peser **moins de 100 Mo**.
+
+Un APK « universel » embarque les bibliothèques natives des 4 architectures
+Android (`arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64`), soit ~87 Mo de `.so` à lui
+seul. `x86` et `x86_64` ne servent qu'aux émulateurs PC : ils sont inutiles sur un
+téléphone réel.
+
+`app.json` limite donc le build aux deux architectures ARM :
+
+```json
+"buildArchs": ["arm64-v8a", "armeabi-v7a"]
+```
+
+`arm64-v8a` couvre tous les téléphones Android récents, `armeabi-v7a` les anciens
+modèles 32 bits. Conséquence : l'APK ne s'installe pas sur un émulateur x86.
+
+Si un futur build dépasse encore 100 Mo, ajouter :
+
+```json
+"enableMinifyInReleaseBuilds": true,
+"enableShrinkResourcesInReleaseBuilds": true
+```
+
+(les deux options vont ensemble : `shrinkResources` exige `minify`).
 
 ## 6. Fonctionnement hors-ligne
 
