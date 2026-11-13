@@ -1,0 +1,646 @@
+{
+  "info": {
+    "name": "Élan API",
+    "description": "Collection de test de l'API Élan (Express + SQLite).\n\n## Démarrage rapide\n1. Démarrer le serveur : `npm run server` (ou `cd server && npm run dev`).\n2. Ouvrir la collection, onglet **Variables**.\n3. `baseUrl` = `http://localhost:3001/api` en local, ou `https://VOTRE-URL.onrender.com/api` sur Render.\n4. Exécuter **Authentification → Connexion client** : le token est enregistré automatiquement dans la variable `token`.\n5. Les requêtes protégées utilisent déjà l'en-tête `Authorization: Bearer {{token}}`.\n\n## Comptes de démonstration (mot de passe : `password123`)\n| Rôle | E-mail |\n|---|---|\n| Client | thomas.lefebvre@example.com |\n| Vendeur | vendeur@elan.com |\n\n> Le token est un jeton signé (HMAC), pas un JWT : il n'a pas de date d'expiration.\n\n> Sur le plan gratuit Render, la première requête peut prendre 30 à 50 secondes (réveil du service).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3001/api" },
+    { "key": "token", "value": "" },
+    { "key": "productId", "value": "panier-fruits-bio" },
+    { "key": "sellerId", "value": "seller-elan" },
+    { "key": "orderId", "value": "" },
+    { "key": "addressId", "value": "" },
+    { "key": "reviewId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1 · Diagnostic",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health",
+            "description": "Vérifie que l'API répond. Aucune authentification requise.\n\nRéponse attendue : `200 { \"status\": \"ok\", \"service\": \"Élan E-Commerce API\", ... }`"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Statut 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Service en ligne', () => pm.expect(pm.response.json().status).to.eql('ok'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2 · Authentification",
+      "item": [
+        {
+          "name": "Connexion client",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"thomas.lefebvre@example.com\",\n  \"password\": \"password123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/auth/login",
+            "description": "Enregistre automatiquement le `token` renvoyé dans la variable de collection."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Connexion réussie (200)', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Token présent', () => pm.expect(body.token).to.be.a('string'));",
+                  "if (body.token) {",
+                  "  pm.collectionVariables.set('token', body.token);",
+                  "  console.log('Token enregistré pour', body.user.email, '(', body.user.role, ')');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Connexion vendeur",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"vendeur@elan.com\",\n  \"password\": \"password123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/auth/login",
+            "description": "Remplace le `token` par celui du vendeur, nécessaire pour les routes `/products` (POST/PATCH/DELETE), `/seller/*` et `/uploads`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.token) {",
+                  "  pm.collectionVariables.set('token', body.token);",
+                  "  pm.collectionVariables.set('sellerId', body.seller && body.seller.id ? body.seller.id : pm.collectionVariables.get('sellerId'));",
+                  "  console.log('Token vendeur enregistré :', body.user.email);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mon profil",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/auth/me",
+            "description": "Renvoie l'utilisateur et la boutique associée au token. `401` si le token est absent ou invalide."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 ou 401', () => pm.expect([200, 401]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inscription client",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Postman\",\n  \"email\": \"test.postman@example.com\",\n  \"password\": \"password123\",\n  \"role\": \"customer\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/auth/register",
+            "description": "`201` à la création, `409` si l'e-mail existe déjà. Pour un vendeur, ajouter `\"role\": \"seller\"` et `\"shopName\": \"Ma boutique\"`."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 · Produits",
+      "item": [
+        {
+          "name": "Liste des produits",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/products",
+            "description": "Catalogue complet. Public, sans token.\n\nAstuce : ajouter un test qui enregistre le premier `id` dans `productId`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const list = pm.response.json();",
+                  "pm.test('Au moins un produit', () => pm.expect(list.length).to.be.above(0));",
+                  "if (Array.isArray(list) && list.length) {",
+                  "  pm.collectionVariables.set('productId', list[0].id);",
+                  "  pm.collectionVariables.set('sellerId', list[0].sellerId);",
+                  "  console.log('productId =', list[0].id, '| sellerId =', list[0].sellerId);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Un produit",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/products/{{productId}}",
+            "description": "`404` si l'identifiant n'existe pas."
+          }
+        },
+        {
+          "name": "Créer un produit (vendeur)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Produit test Postman\",\n  \"description\": \"Créé depuis Postman\",\n  \"price\": 49.9,\n  \"stock\": 5,\n  \"category\": \"Accessoires\",\n  \"images\": [\"https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80\"]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/products",
+            "description": "Nécessite un token **vendeur** (`403` avec un compte client, `401` sans token)."
+          }
+        },
+        {
+          "name": "Modifier un produit (vendeur)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 39.9,\n  \"stock\": 12\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/products/{{productId}}"
+          }
+        },
+        {
+          "name": "Supprimer un produit (vendeur)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/products/{{productId}}",
+            "description": "Supprime uniquement un produit appartenant au vendeur connecté."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 · Boutiques",
+      "item": [
+        {
+          "name": "Liste des boutiques",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/sellers"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const list = pm.response.json();",
+                  "if (Array.isArray(list) && list.length) { pm.collectionVariables.set('sellerId', list[0].id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Une boutique",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/sellers/{{sellerId}}"
+          }
+        },
+        {
+          "name": "Produits d'une boutique",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/sellers/{{sellerId}}/products"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 · Commandes",
+      "item": [
+        {
+          "name": "Mes commandes",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/orders",
+            "description": "Commandes de l'utilisateur connecté (ou du vendeur : celles qui le concernent)."
+          }
+        },
+        {
+          "name": "Une commande",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/orders/{{orderId}}"
+          }
+        },
+        {
+          "name": "Créer une commande",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    { \"productId\": \"{{productId}}\", \"quantity\": 1 }\n  ],\n  \"shippingAddress\": \"12 rue de la Paix, 75002 Paris\",\n  \"deliveryMode\": \"standard\",\n  \"shippingCost\": 4.9,\n  \"status\": \"pending\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/orders",
+            "description": "Décrémente le stock. `409` si le stock est insuffisant. `deliveryMode` : `standard` ou `express`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  const order = body.order || body;",
+                  "  if (order && order.id) { pm.collectionVariables.set('orderId', order.id); }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Changer le statut (vendeur)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"shipped\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/orders/{{orderId}}/status",
+            "description": "Réservé au vendeur concerné par la commande."
+          }
+        }
+      ]
+    },
+    {
+      "name": "6 · Paiement Stripe",
+      "item": [
+        {
+          "name": "Créer un PaymentIntent",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    { \"productId\": \"{{productId}}\", \"quantity\": 1 }\n  ],\n  \"shippingMode\": \"standard\",\n  \"shippingCost\": 4.9\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/payments/create-intent",
+            "description": "Le montant est recalculé côté serveur à partir du catalogue : impossible de le falsifier depuis le client.\n\nRéponse : `{ clientSecret, amount, currency }`. Le `clientSecret` sert ensuite dans l'app avec `@stripe/stripe-react-native`.\n\n`500` si `STRIPE_SECRET_KEY` est absente ou invalide côté serveur."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 attendu', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('clientSecret présent', () => pm.expect(body.clientSecret).to.be.a('string'));",
+                  "console.log('Montant facturé :', body.amount, body.currency);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7 · Favoris",
+      "item": [
+        {
+          "name": "Mes favoris",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/favorites"
+          }
+        },
+        {
+          "name": "Ids des favoris",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/favorites/ids"
+          }
+        },
+        {
+          "name": "Basculer un favori",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/favorites/{{productId}}/toggle",
+            "description": "Ajoute le produit aux favoris s'il n'y est pas, le retire sinon."
+          }
+        }
+      ]
+    },
+    {
+      "name": "8 · Avis",
+      "item": [
+        {
+          "name": "Avis d'un produit",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/reviews/product/{{productId}}"
+          }
+        },
+        {
+          "name": "Publier un avis",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"rating\": 5,\n  \"comment\": \"Excellent produit, testé depuis Postman.\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/reviews"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const review = body.review || body;",
+                  "if (review && review.id) { pm.collectionVariables.set('reviewId', review.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Supprimer un avis",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/reviews/{{reviewId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "9 · Codes promo",
+      "item": [
+        {
+          "name": "Valider un code promo",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    { \"productId\": \"{{productId}}\", \"quantity\": 1 }\n  ],\n  \"couponCode\": \"POSTMAN10\",\n  \"shippingCost\": 4.9\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/coupons/validate",
+            "description": "Renvoie le détail du prix : sous-total, remise, livraison, total.\n\nAucun code n'est fourni par les données de démo : crée d'abord `POSTMAN10` via **11 · Espace vendeur → Créer un code promo** (token vendeur), puis reviens ici avec le token client."
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 · Adresses",
+      "item": [
+        {
+          "name": "Mes adresses",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/addresses"
+          }
+        },
+        {
+          "name": "Ajouter une adresse",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"Maison\",\n  \"fullName\": \"Thomas Lefebvre\",\n  \"line1\": \"12 rue de la Paix\",\n  \"city\": \"Paris\",\n  \"postalCode\": \"75002\",\n  \"country\": \"France\",\n  \"phone\": \"+33612345678\",\n  \"isDefault\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/addresses"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const address = body.address || body;",
+                  "if (address && address.id) { pm.collectionVariables.set('addressId', address.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Modifier une adresse",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"city\": \"Lyon\",\n  \"postalCode\": \"69001\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/addresses/{{addressId}}"
+          }
+        },
+        {
+          "name": "Supprimer une adresse",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/addresses/{{addressId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 · Espace vendeur",
+      "item": [
+        {
+          "name": "Tableau de bord",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/seller/dashboard",
+            "description": "Chiffre d'affaires, nombre de commandes, produits, note moyenne. Token **vendeur** obligatoire."
+          }
+        },
+        {
+          "name": "Mes produits",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/seller/products"
+          }
+        },
+        {
+          "name": "Mes commandes",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/seller/orders"
+          }
+        },
+        {
+          "name": "Mes factures",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/seller/invoices"
+          }
+        },
+        {
+          "name": "Mes avis",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/seller/reviews"
+          }
+        },
+        {
+          "name": "Mon profil de boutique",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/seller/profile"
+          }
+        },
+        {
+          "name": "Mes codes promo",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/seller/coupons"
+          }
+        },
+        {
+          "name": "Créer un code promo",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"POSTMAN10\",\n  \"type\": \"percent\",\n  \"value\": 10,\n  \"minSubtotal\": 0,\n  \"maxUses\": 100,\n  \"isActive\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/seller/coupons"
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 · Upload d'image",
+      "item": [
+        {
+          "name": "Téléverser une image (vendeur)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": "",
+                  "description": "Sélectionner un fichier JPG/PNG depuis Postman"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/uploads",
+            "description": "Renvoie `{ url: \"/uploads/xxxx.jpg\" }`. L'URL complète est `https://VOTRE-API.onrender.com/uploads/xxxx.jpg` (sans `/api`).\n\n⚠️ Sur Render (plan gratuit), le disque est éphémère : les images téléversées disparaissent au redéploiement."
+          }
+        }
+      ]
+    }
+  ]
+}
