@@ -33,6 +33,7 @@
         }
       ],
       "expo-status-bar",
+      "./plugins/withStripeTapAndPayFix",
       [
         "expo-build-properties",
         {
