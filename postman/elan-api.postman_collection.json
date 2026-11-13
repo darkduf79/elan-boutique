@@ -464,11 +464,11 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"items\": [\n    { \"productId\": \"{{productId}}\", \"quantity\": 1 }\n  ],\n  \"couponCode\": \"POSTMAN10\",\n  \"shippingCost\": 4.9\n}",
+              "raw": "{\n  \"items\": [\n    { \"productId\": \"sacoche-cuir-minimal\", \"quantity\": 2 }\n  ],\n  \"couponCode\": \"POSTMAN10\",\n  \"shippingCost\": 4.9\n}",
               "options": { "raw": { "language": "json" } }
             },
             "url": "{{baseUrl}}/coupons/validate",
-            "description": "Renvoie le détail du prix : sous-total, remise, livraison, total.\n\nAucun code n'est fourni par les données de démo : crée d'abord `POSTMAN10` via **11 · Espace vendeur → Créer un code promo** (token vendeur), puis reviens ici avec le token client."
+            "description": "Renvoie le détail du prix : sous-total, remise, livraison, total.\n\n⚠️ Règle métier : un code promo ne s'applique qu'aux produits du vendeur qui l'a créé. Un code du vendeur `seller-elan` sur un produit `seller-marche` renvoie `400 \"Ce code promo ne s'applique à aucun article de votre panier.\"`\n\nCodes disponibles :\n- `POSTMAN10` (10 %, créé via la requête « Créer un code promo », vendeur `vendeur@elan.com`)\n- `ELAN10` (10 %, minimum 50 $, fourni par les données de démo)\n\nLes deux ne fonctionnent que sur `sacoche-cuir-minimal` ou `robe-plissee`."
           }
         }
       ]
