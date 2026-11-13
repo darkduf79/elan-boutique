@@ -39,6 +39,7 @@
         {
           "android": {
             "usesCleartextTraffic": true,
+            "buildArchs": ["arm64-v8a", "armeabi-v7a"],
             "extraProguardRules": "-dontwarn com.stripe.android.pushProvisioning.**\n-dontwarn com.google.android.gms.tapandpay.**"
           }
         }
