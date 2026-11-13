@@ -1,0 +1,63 @@
+{
+  "expo": {
+    "name": "Élan",
+    "slug": "boutique-en-ligne",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "boutique-en-ligne",
+    "userInterfaceStyle": "light",
+    "plugins": [
+      "expo-router",
+      "expo-sharing",
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.elan.boutique",
+          "enableGooglePay": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Autorisez Élan à accéder à vos photos pour illustrer vos produits et votre boutique."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#2563EB",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain"
+        }
+      ],
+      "expo-status-bar"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#2563EB",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "icon": "./assets/icon.png",
+      "package": "com.mosesduflou.boutiqueenligne"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "e08f5880-c1e4-48c7-99e1-894e6f05afdb"
+      }
+    }
+  }
+}
